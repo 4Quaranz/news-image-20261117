@@ -1,8 +1,8 @@
 # news-image-20261117
 
-[![make.fun · news-image-20261117](https://img.shields.io/badge/make.fun-news--image--20261117-7c3aed)](https://make.fun/bounty/news-image-20261117)
-[![reward $250 USDC](https://img.shields.io/badge/reward-%24250_USDC-16a34a)](https://make.fun/bounty/news-image-20261117)
-[![rank top 50](https://img.shields.io/badge/rank-top_50-f59e0b)](https://make.fun/bounty/news-image-20261117)
+[![make.fun · news-image-20261117](https://make.fun/badge/news-image-20261117.svg)](https://make.fun/bounty/news-image-20261117?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117)
+[![rank](https://make.fun/badge/news-image-20261117/4Quaranz/news-image-20261117/rank.svg)](https://make.fun/bounty/news-image-20261117/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117)
+[![reward](https://make.fun/badge/news-image-20261117/4Quaranz/news-image-20261117/reward.svg)](https://make.fun/bounty/news-image-20261117?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117)
 
 **17 November 2026 — The World Today.** One front-page image summing up
 the world's news of Tuesday, 17 November 2026: the Kerch Bridge attack,
