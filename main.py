@@ -1,82 +1,143 @@
 #!/usr/bin/env python3
-"""Reproduce the news-image-20261117 entry artwork.
+"""Publish the finished front page for 17 November 2026.
 
-The entry is a single front-page image, "17 November 2026 - The World
-Today", stored in this repository as entry.png. This module writes that
-stored image to /output/entry.png. It downloads nothing and draws nothing:
-the bytes already on disk are copied out unchanged, so every run produces
-the exact same file.
+The artwork itself ships in this repository as ``entry.png``. This program
+does nothing creative: it copies that file to ``/output/entry.png`` and
+proves the copy is exact by comparing SHA-256 digests computed while the
+bytes move. No network, no clock, no randomness — running it twice writes
+the same bytes both times.
+
+Exit codes:
+    0  published and verified
+    2  the artwork is missing
+    3  the destination could not be written
+    4  the copy does not match the source
 """
 
-from __future__ import annotations
-
+import argparse
 import hashlib
 import sys
 from pathlib import Path
 
-ARTWORK = "entry.png"
-DEFAULT_DESTINATION = Path("/output/entry.png")
-CHUNK = 64 * 1024
+ARTWORK_NAME = "entry.png"
+DEFAULT_DESTINATION = "/output/entry.png"
+BLOCK_SIZE = 32 * 1024  # 32 KiB per read
+
+EXIT_OK = 0
+EXIT_MISSING = 2
+EXIT_WRITE_ERROR = 3
+EXIT_MISMATCH = 4
 
 
-def find_artwork() -> Path:
-    """Locate the bundled artwork next to this file."""
-    candidate = Path(__file__).resolve().parent / ARTWORK
-    if not candidate.is_file():
-        raise SystemExit(f"artwork missing: expected {candidate}")
-    return candidate
-
-
-def stream_copy(source: Path, destination: Path) -> tuple[int, str]:
-    """Copy source to destination in blocks.
-
-    Returns the byte count and the SHA-256 of the bytes read, so the caller
-    can prove the copy is exact without re-reading the source.
-    """
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    digest = hashlib.sha256()
-    written = 0
-    with source.open("rb") as reader, destination.open("wb") as writer:
-        while True:
-            block = reader.read(CHUNK)
-            if not block:
-                break
-            digest.update(block)
-            writer.write(block)
-            written += len(block)
-    return written, digest.hexdigest()
+def artwork_path() -> Path:
+    """Return the artwork bundled next to this script."""
+    return Path(__file__).resolve().parent / ARTWORK_NAME
 
 
 def digest_file(path: Path) -> str:
-    """SHA-256 of a file, read back in blocks."""
-    digest = hashlib.sha256()
+    """Return the hex SHA-256 digest of a file, read in blocks."""
+    hasher = hashlib.sha256()
     with path.open("rb") as handle:
         while True:
-            block = handle.read(CHUNK)
-            if not block:
+            chunk = handle.read(BLOCK_SIZE)
+            if not chunk:
                 break
-            digest.update(block)
-    return digest.hexdigest()
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
-def main(argv: list[str]) -> int:
-    destination = Path(argv[1]) if len(argv) > 1 else DEFAULT_DESTINATION
-    source = find_artwork()
+def publish(source: Path, destination: Path) -> tuple[int, str, str]:
+    """Stream-copy ``source`` to ``destination`` and verify the result.
+
+    The source digest is accumulated while copying, so the file is read
+    once. The destination is then hashed again from disk and the two
+    digests must agree. Returns ``(bytes_written, source_digest,
+    destination_digest)``.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    hasher = hashlib.sha256()
+    written = 0
+    with source.open("rb") as reader, destination.open("wb") as writer:
+        while True:
+            chunk = reader.read(BLOCK_SIZE)
+            if not chunk:
+                break
+            hasher.update(chunk)
+            writer.write(chunk)
+            written += len(chunk)
+    return written, hasher.hexdigest(), digest_file(destination)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Publish entry.png to /output/entry.png, verified.",
+    )
+    parser.add_argument(
+        "--out",
+        default=DEFAULT_DESTINATION,
+        help="destination path (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="artwork to publish (default: entry.png next to this script)",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="only check an existing output against the artwork, do not copy",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="print nothing on success",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    source = Path(args.source) if args.source else artwork_path()
+    destination = Path(args.out)
+
+    if not source.is_file():
+        print(f"error: artwork not found: {source}", file=sys.stderr)
+        return EXIT_MISSING
+
+    if source.resolve() == destination.resolve():
+        print("error: source and destination are the same file", file=sys.stderr)
+        return EXIT_WRITE_ERROR
+
+    if args.verify:
+        if not destination.is_file():
+            print(f"error: no output to verify: {destination}", file=sys.stderr)
+            return EXIT_MISSING
+        source_digest = digest_file(source)
+        output_digest = digest_file(destination)
+        if source_digest != output_digest:
+            print("mismatch: output differs from artwork", file=sys.stderr)
+            return EXIT_MISMATCH
+        if not args.quiet:
+            print(f"verified: {destination} matches {source} ({output_digest})")
+        return EXIT_OK
+
     try:
-        total, source_digest = stream_copy(source, destination)
+        written, source_digest, output_digest = publish(source, destination)
     except OSError as exc:
         print(f"error: cannot write {destination}: {exc}", file=sys.stderr)
-        return 1
-    written_digest = digest_file(destination)
-    print(f"wrote {destination} ({total} bytes) from {source.name}")
-    print(f"source sha256:      {source_digest}")
-    print(f"output sha256:      {written_digest}")
-    if written_digest != source_digest:
-        print("error: output does not match source", file=sys.stderr)
-        return 1
-    print("verified: output matches source exactly")
-    return 0
+        return EXIT_WRITE_ERROR
+
+    if source_digest != output_digest:
+        print("mismatch: copy differs from artwork", file=sys.stderr)
+        return EXIT_MISMATCH
+
+    if not args.quiet:
+        print(f"wrote {destination} ({written} bytes)")
+        print(f"source sha256: {source_digest}")
+        print(f"output sha256: {output_digest}")
+        print("verified: output matches source exactly")
+    return EXIT_OK
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv))
+    raise SystemExit(main())

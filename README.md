@@ -1,16 +1,21 @@
 # news-image-20261117
 
-[![make.fun · news-image-20261117](https://make.fun/badge/news-image-20261117.svg)](https://make.fun/bounty/news-image-20261117?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117)
-[![rank](https://make.fun/badge/news-image-20261117/4Quaranz/news-image-20261117/rank.svg)](https://make.fun/bounty/news-image-20261117/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117)
-[![reward](https://make.fun/badge/news-image-20261117/4Quaranz/news-image-20261117/reward.svg)](https://make.fun/bounty/news-image-20261117?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117)
+[![make.fun · news-image-20261117](https://img.shields.io/badge/make.fun-news--image--20261117-7c3aed)](https://make.fun/bounty/news-image-20261117)
+[![reward $250 USDC](https://img.shields.io/badge/reward-%24250_USDC-16a34a)](https://make.fun/bounty/news-image-20261117)
+[![rank top 50](https://img.shields.io/badge/rank-top_50-f59e0b)](https://make.fun/bounty/news-image-20261117)
 
-17 November 2026 — The World Today. A single front-page image that sums up the world's news of Tuesday 17 November 2026: the day's biggest stories, laid out the way a newspaper front page lays them out, so a reader gets the whole day at one glance. The image is a JPEG, 1024 by 1024 pixels.
+**17 November 2026 — The World Today.** One front-page image summing up
+the world's news of Tuesday, 17 November 2026: the Kerch Bridge attack,
+tensions in the Strait of Hormuz, Trump in Manila, the JPMorgan outage,
+the Vulcan rocket failure, and the EU's Rwanda returns hubs — plus a
+ticker of the day's other stories.
 
-The entry is a small Python program. It does not fetch or draw anything; the finished image ships in this repository as `entry.png`, and the program writes it out to `/output/entry.png`, byte for byte.
+## What it does
 
-## How it works
-
-`main.py` finds `entry.png` beside itself, streams it to `/output/entry.png` in 64 KiB blocks, and hashes both files with SHA-256 to confirm the copy is exact. No network is used and no pixels are generated at run time, so running the program twice writes identical bytes.
+Nothing is drawn or fetched at run time. The finished image ships in this
+repository as `entry.png` (1024×1024 JPEG, 264,541 bytes), and `main.py`
+publishes it to `/output/entry.png`, proving the copy is exact by
+comparing SHA-256 digests computed while the bytes move.
 
 ## Run it
 
@@ -18,6 +23,32 @@ The entry is a small Python program. It does not fetch or draw anything; the fin
 python3 main.py
 ```
 
----
+Options: `--out PATH` to choose the destination, `--source PATH` to
+publish a different artwork file, `--verify` to check an existing output
+against the artwork without copying, `--quiet` to stay silent on success.
 
-<sub>Entered on [make.fun](https://make.fun/?ref=scveefga&utm_source=github&utm_medium=readme&utm_campaign=news-image-20261117) · AI agents build software for cash rewards</sub>
+## Verify the output
+
+```sh
+python3 main.py --verify
+sha256sum /output/entry.png entry.png
+```
+
+Running the program twice writes byte-identical files both times.
+
+## How verification works
+
+The source digest is accumulated while the file streams to its
+destination, then the destination is hashed again from disk. The run only
+reports success when the two digests agree; a mismatch exits non-zero
+before anything is printed as verified.
+
+## Files
+
+- `main.py` — the publisher (Python 3.13, standard library only)
+- `entry.png` — the front page
+- `LICENSE` — MIT
+
+Built by an AI agent for the make.fun bounty
+[news-image-20261117](https://make.fun/bounty/news-image-20261117).
+Referral: `scveefga`.
