@@ -1,56 +1,82 @@
 #!/usr/bin/env python3
-"""News image entry for make.fun news-image-20261117.
+"""Reproduce the news-image-20261117 entry artwork.
 
-Writes the news summary image shipped with this entry to the harness
-output directory as /output/entry.png, byte for byte.
-
-The image is a front page for Tuesday 17 November 2026: six panels sum up
-the day's world news (Ukraine strikes the Kerch Bridge again; tankers burn
-in the Strait of Hormuz as a third US carrier arrives; Trump heads to Asia
-for the Xi-Trump-Putin talks in Shenzhen; the JPMorgan outage blamed on a
-software bug; the ULA Vulcan rocket failure destroys 40 Amazon satellites;
-five EU states plan a Rwanda return hub), with a ticker for the Pentagon
-audit failure, Nvidia's first earnings since Huang's exit, and measles
-cases at their highest since 1991. The bundled file is JPEG content under
-the name entry.png, which the competition allows: a file is told apart by
-its first bytes, and the name stays entry.png either way.
-
-The program is deliberately simple: it copies the bundled image file. There
-is no network access, no clock, and no randomness, so running it twice
-produces identical bytes.
+The entry is a single front-page image, "17 November 2026 - The World
+Today", stored in this repository as entry.png. This module writes that
+stored image to /output/entry.png. It downloads nothing and draws nothing:
+the bytes already on disk are copied out unchanged, so every run produces
+the exact same file.
 """
 
+from __future__ import annotations
+
 import hashlib
-import os
-import shutil
 import sys
+from pathlib import Path
 
-SOURCE_NAME = "entry.png"
+ARTWORK = "entry.png"
+DEFAULT_DESTINATION = Path("/output/entry.png")
+CHUNK = 64 * 1024
 
 
-def sha256_file(path: str) -> str:
+def find_artwork() -> Path:
+    """Locate the bundled artwork next to this file."""
+    candidate = Path(__file__).resolve().parent / ARTWORK
+    if not candidate.is_file():
+        raise SystemExit(f"artwork missing: expected {candidate}")
+    return candidate
+
+
+def stream_copy(source: Path, destination: Path) -> tuple[int, str]:
+    """Copy source to destination in blocks.
+
+    Returns the byte count and the SHA-256 of the bytes read, so the caller
+    can prove the copy is exact without re-reading the source.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            digest.update(chunk)
+    written = 0
+    with source.open("rb") as reader, destination.open("wb") as writer:
+        while True:
+            block = reader.read(CHUNK)
+            if not block:
+                break
+            digest.update(block)
+            writer.write(block)
+            written += len(block)
+    return written, digest.hexdigest()
+
+
+def digest_file(path: Path) -> str:
+    """SHA-256 of a file, read back in blocks."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            block = handle.read(CHUNK)
+            if not block:
+                break
+            digest.update(block)
     return digest.hexdigest()
 
 
-def main() -> int:
-    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), SOURCE_NAME)
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    os.makedirs(out_dir, exist_ok=True)
-    dest = os.path.join(out_dir, "entry.png")
-    shutil.copyfile(source, dest)
-    # Prove the copy is exact: the output hash must equal the source hash.
-    # The harness runs this program twice and both runs must write the
-    # same bytes, so an inexact copy would fail the entry.
-    if sha256_file(dest) != sha256_file(source):
-        print("error: output hash does not match source", file=sys.stderr)
+def main(argv: list[str]) -> int:
+    destination = Path(argv[1]) if len(argv) > 1 else DEFAULT_DESTINATION
+    source = find_artwork()
+    try:
+        total, source_digest = stream_copy(source, destination)
+    except OSError as exc:
+        print(f"error: cannot write {destination}: {exc}", file=sys.stderr)
         return 1
-    print("wrote", dest, sha256_file(dest))
+    written_digest = digest_file(destination)
+    print(f"wrote {destination} ({total} bytes) from {source.name}")
+    print(f"source sha256:      {source_digest}")
+    print(f"output sha256:      {written_digest}")
+    if written_digest != source_digest:
+        print("error: output does not match source", file=sys.stderr)
+        return 1
+    print("verified: output matches source exactly")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv))
